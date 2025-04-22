@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat Seguro - FastAPI</title>
+  <style>
+    body { font-family: Arial; padding: 2rem; }
+    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; margin-bottom: 1rem; padding: 1rem; }
+    #token, #message { width: 100%; margin-bottom: 1rem; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+
+  <h1>💬 Messenger Seguro con WebSocket + JWT</h1>
+
+  <input id="token" placeholder="🔐 Pega tu token aquí (sin 'Bearer ')" />
+  <button onclick="connect()">Conectar</button>
+
+  <div id="chat"></div>
+
+  <input id="message" placeholder="Escribe tu mensaje..." />
+  <button onclick="sendMessage()">Enviar</button>
+
+  <script>
+    let socket = null;
+
+    function connect() {
+      const token = document.getElementById("token").value;
+      if (!token) return alert("Pega tu token primero");
+
+      socket = new WebSocket(`ws://127.0.0.1:8000/ws/chat?token=${token}`);
+
+      socket.onopen = () => {
+        append("✅ Conectado al WebSocket");
+        loadHistory(token);
+      };
+
+      socket.onmessage = (event) => {
+        append("📩 " + event.data);
+      };
+
+      socket.onclose = () => {
+        append("❌ Conexión cerrada");
+      };
+    }
+
+    function sendMessage() {
+      const msg = document.getElementById("message").value;
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(msg);
+        append("📤 Tú: " + msg);
+        document.getElementById("message").value = "";
+      } else {
+        append("⚠️ El WebSocket no está conectado.");
+      }
+    }
+
+    function append(text) {
+      const chat = document.getElementById("chat");
+      chat.innerHTML += `<div>${text}</div>`;
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function loadHistory(token) {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/messages", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error("Token inválido o backend no responde");
+        }
+        const messages = await response.json();
+        messages.forEach(msg => {
+          append(`${msg.sender} said: ${msg.message}`);
+        });
+      } catch (error) {
+        append("❌ Error al cargar historial");
+        console.error(error);
+      }
+    }
+  </script>
+
+</body>
+</html>
